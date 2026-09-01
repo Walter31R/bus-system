@@ -9,7 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import com.example.Backend_Bus.Repository.BusRepository;
 import org.springframework.web.server.ResponseStatusException;
-
+import org.springframework.data.jpa.domain.Specification;
+import com.example.Backend_Bus.Repository.BusSpecification;
 @Service
 public class BusService {
 
@@ -79,16 +80,11 @@ public class BusService {
         busRepository.delete(bus);
     }
 
-    // Busca buses por placa
-    public Page<Bus> buscarPorPlaca(String placa, Pageable pageable) {
-        return busRepository.findByPlacaContainingIgnoreCase(placa, pageable);
-    }
-    //Busca por marca
-    public Page<Bus> buscarPorMarca(Long marcaId, Pageable pageable) {
-        return busRepository.findByMarcaId(marcaId, pageable);
-    }
-    // Filtra buses por estado activo o inactivo
-    public Page<Bus> buscarPorActivo(Boolean activo, Pageable pageable) {
-        return busRepository.findByActivo(activo, pageable);
+    // Búsqueda combinada reemplaza a buscarPorPlaca, buscarPorMarca y buscarPorActivo
+    public Page<Bus> buscarCombinado(String placa, Long marcaId, Boolean activo, Pageable pageable) {
+        Specification<Bus> spec = BusSpecification.tienePlaca(placa)
+                .and(BusSpecification.tieneMarca(marcaId))
+                .and(BusSpecification.tieneActivo(activo));
+        return busRepository.findAll(spec, pageable);
     }
 }

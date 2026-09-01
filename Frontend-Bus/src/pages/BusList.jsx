@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getBuses, getBusById, crearBus, actualizarBus, eliminarBus, buscarPorPlaca, buscarPorMarca, buscarPorActivo   } from "../services/BusServices";
+import { getBuses, getBusById, crearBus, actualizarBus, eliminarBus, buscarCombinado } from "../services/BusServices";
 import { logout } from "../services/AuthServices";
 import BusCard from "../components/BusCard";
 import BusDetail from "./BusDetail";
@@ -19,47 +19,37 @@ function BusList({ onLogout }) {
     const [buscarId, setBuscarId] = useState("");
     const [errorBusqueda, setErrorBusqueda] = useState(null);
 
-    // useState: para el buscador por placa 
+    // useState: para los filtros combinados
     const [buscarPlaca, setBuscarPlaca] = useState("");
-    const [buscandoPorPlaca, setBuscandoPorPlaca] = useState(false);
-
-    // useState: para el buscador por marca
     const [marcaId, setMarcaId] = useState("");
-    const [marcas, setMarcas] = useState([]);
-    const [buscandoPorMarca, setBuscandoPorMarca] = useState(false);
-    
-    // useState: para el buscador por estado
     const [activo, setActivo] = useState("");
-    const [buscandoPorActivo, setBuscandoPorActivo] = useState(false);
+    const [marcas, setMarcas] = useState([]);
 
     const [busEditar, setBusEditar] = useState(null);
     const [mostrarForm, setMostrarForm] = useState(false);
 
-   useEffect(() => {
-    if (buscandoPorMarca) {
-        buscarPorMarca(marcaId, page, 5).then(data => {
-            setBuses(data.content);
-            setTotalPages(data.totalPages);
-        });
-    } else if (buscandoPorPlaca) {
-        buscarPorPlaca(buscarPlaca, page, 5).then(data => {
-            setBuses(data.content);
-            setTotalPages(data.totalPages);
-        });
-    } else if (buscandoPorActivo) {
-        buscarPorActivo(activo, page, 5).then(data => {
-            setBuses(data.content);
-            setTotalPages(data.totalPages);
-        });
-    } else {
-        cargarBuses();
-    }
+    useEffect(() => {
+        aplicarFiltros(page);
     }, [page]);
+
+    // Carga las marcas al iniciar
+    useEffect(() => {
+        const cargarMarcas = async () => {
+            try {
+                const data = await getMarcas();
+                setMarcas(data);
+            } catch (err) {
+                console.error("Error al cargar marcas");
+            }
+        };
+        cargarMarcas();
+    }, []);
+
     // Carga la lista normal de buses
     const cargarBuses = async () => {
         setLoading(true);
         try {
-            const data = await getBuses(page, 5);
+            const data = await getBuses(0, 5);
             setBuses(data.content);
             setTotalPages(data.totalPages);
         } catch (err) {
@@ -69,93 +59,64 @@ function BusList({ onLogout }) {
         }
     };
 
-    // Busca buses por placa 
-    const handleBuscarPorPlaca = async () => {
-        if (!buscarPlaca) {
-            // Si borra el texto vuelve a la lista normal
-            setBuscandoPorPlaca(false);
-            setPage(0);
-            cargarBuses();
-            return;
-        }
+   
+    const aplicarFiltros = async (pagina = 0) => {
         setLoading(true);
-        setErrorBusqueda(null);
-        setBuscandoPorPlaca(true);
-        setPage(0);
         try {
-            const data = await buscarPorPlaca(buscarPlaca, page, 5);
+            const data = await buscarCombinado(
+                { placa: buscarPlaca, marcaId, activo },
+                pagina, 5
+            );
             setBuses(data.content);
             setTotalPages(data.totalPages);
             if (data.content.length === 0) {
-                setErrorBusqueda("No se encontraron buses con esa placa");
+                setErrorBusqueda("No se encontraron buses");
+            } else {
+                setErrorBusqueda(null);
             }
         } catch (err) {
-            setErrorBusqueda("Error al buscar por placa");
+            setError(err.message);
         } finally {
             setLoading(false);
         }
     };
-    //Busca buses por marca 
-    useEffect(() => {
-    const cargarMarcas = async () => {
-        try {
-            const data = await getMarcas();
-            setMarcas(data);
-        } catch (err) {
-            console.error("Error al cargar marcas");
-        }
-    };
-    cargarMarcas();
-    }, []);
 
-    // Limpia el buscador por placa y vuelve a la lista normal
-    const limpiarBusquedaPlaca = () => {
-        setBuscarPlaca("");
-        setBuscandoPorPlaca(false);
+    // Busca por placa y aplica filtros combiandos
+    const handleBuscarPorPlaca = () => {
         setPage(0);
-        cargarBuses();
-    };
-    // Filtra la tabla según la marca seleccionada 
-    const handleBuscarPorMarca = async (id) => {
-    setMarcaId(id);
-    if (!id) {
-        setBuscandoPorMarca(false);
-        cargarBuses();
-        return;
-    }
-    setLoading(true);
-    setBuscandoPorMarca(true);
-    try {
-        const data = await buscarPorMarca(id, 0, 5);
-        setBuses(data.content);
-        setTotalPages(data.totalPages);
-    } catch (err) {
-        setError(err.message);
-    } finally {
-        setLoading(false);
-    }
+        aplicarFiltros(0);
     };
 
-    // Filtra la tabla según si el bus está activo o inactivo
-    const handleBuscarPorActivo = async (valor) => {
-    setActivo(valor);
-    if (valor === "") {
-        setBuscandoPorActivo(false);
+    // Cambia la marca y aplica filtros combinados
+    const handleBuscarPorMarca = (id) => {
+        setMarcaId(id);
+        setPage(0);
+        buscarCombinado({ placa: buscarPlaca, marcaId: id, activo }, 0, 5)
+            .then(data => {
+                setBuses(data.content);
+                setTotalPages(data.totalPages);
+            });
+    };
+
+    // Cambia el estado activo y aplica filtros combinados
+    const handleBuscarPorActivo = (valor) => {
+        setActivo(valor);
+        setPage(0);
+        buscarCombinado({ placa: buscarPlaca, marcaId, activo: valor }, 0, 5)
+            .then(data => {
+                setBuses(data.content);
+                setTotalPages(data.totalPages);
+            });
+    };
+
+    // Limpia todos los filtros y vuelve a la lista normal
+    const limpiarFiltros = () => {
+        setBuscarPlaca("");
+        setMarcaId("");
+        setActivo("");
+        setPage(0);
+        setErrorBusqueda(null);
         cargarBuses();
-        return;
-    }
-    setLoading(true);
-    setBuscandoPorActivo(true);
-    setPage(0);
-    try {
-        const data = await buscarPorActivo(valor, 0, 5);
-        setBuses(data.content);
-        setTotalPages(data.totalPages);
-    } catch (err) {
-        setError(err.message);
-    } finally {
-        setLoading(false);
-    }
     };
 
     // Busca por ID y muestra en modal
@@ -190,7 +151,7 @@ function BusList({ onLogout }) {
             }
             setMostrarForm(false);
             setBusEditar(null);
-            cargarBuses();
+            aplicarFiltros(page);
         } catch (e) {
             throw e;
         }
@@ -217,8 +178,8 @@ function BusList({ onLogout }) {
         if (!window.confirm("¿Seguro que deseas eliminar este bus?")) return;
         try {
             await eliminarBus(id);
-            // Recarga la lista después de eliminar
-            cargarBuses();
+
+            aplicarFiltros(page);
         } catch (err) {
             alert("Error al eliminar: " + err.message);
         }
@@ -261,38 +222,40 @@ function BusList({ onLogout }) {
                 />
                 <button onClick={handleBuscarPorPlaca}>🔍 Buscar Placa</button>
 
-                {/* Botón limpiar y aparece solo cuando se está buscando por placa */}
-                {buscandoPorPlaca && (
-                    <button onClick={limpiarBusquedaPlaca} style={{ color: "red" }}>
-                        ✖ Limpiar
-                    </button>
-                )}
-                {/* Buscar por marca */}
-                 <select
-                value={marcaId}
-                onChange={(e) => handleBuscarPorMarca(e.target.value)}
-                style={{ padding: "8px" }}>
-                <option value="">Todas las marcas</option>
-                {marcas.map((m) => (
-                <option key={m.id} value={m.id}>{m.nombre}</option>
-                 ))}
+                {/* Filtrar por marca */}
+                <select
+                    value={marcaId}
+                    onChange={(e) => handleBuscarPorMarca(e.target.value)}
+                    style={{ padding: "8px" }}>
+                    <option value="">Todas las marcas</option>
+                    {marcas.map((m) => (
+                        <option key={m.id} value={m.id}>{m.nombre}</option>
+                    ))}
                 </select>
+
                 {/* Filtrar por estado activo/inactivo */}
                 <select
-                value={activo}
-                onChange={(e) => handleBuscarPorActivo(e.target.value)}
-                style={{ padding: "8px" }}>
-                <option value="">Todos los estados</option>
-                <option value="true">✅ Activo</option>
-                <option value="false">❌ Inactivo</option>
+                    value={activo}
+                    onChange={(e) => handleBuscarPorActivo(e.target.value)}
+                    style={{ padding: "8px" }}>
+                    <option value="">Todos los estados</option>
+                    <option value="true">✅ Activo</option>
+                    <option value="false">❌ Inactivo</option>
                 </select>
+
+                {/* Botón limpiar todos los filtros */}
+                {(buscarPlaca || marcaId || activo) && (
+                    <button onClick={limpiarFiltros} style={{ color: "red" }}>
+                        ✖ Limpiar filtros
+                    </button>
+                )}
 
                 <button onClick={abrirAgregar} style={{ marginLeft: "auto" }}>
                     ➕ Agregar Bus
                 </button>
             </div>
 
-            {/* Muestra el mensaje si el bus no existe */}
+            {/* Muestra el mensaje si no hay resultados */}
             {errorBusqueda && (
                 <p style={{ color: "red" }}>❌ {errorBusqueda}</p>
             )}

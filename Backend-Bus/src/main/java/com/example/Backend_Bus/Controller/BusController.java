@@ -53,17 +53,8 @@ public class BusController {
     public Page<Bus> buscar(
             @RequestParam(required = false) String placa,
             @RequestParam(required = false) Long marcaId,
-            @RequestParam(required = false) Boolean activo,  // ← agrega esto
+            @RequestParam(required = false) Boolean activo,
             Pageable pageable) {
-        if (placa != null && !placa.isEmpty()) {
-            return busService.buscarPorPlaca(placa, pageable);
-        }
-        if (marcaId != null) {
-            return busService.buscarPorMarca(marcaId, pageable);
-        }
-        if (activo != null) {                                // ← agrega esto
-            return busService.buscarPorActivo(activo, pageable);
-        }
-        return busService.listarBuses(pageable);
+        return busService.buscarCombinado(placa, marcaId, activo, pageable);
     }
 }
