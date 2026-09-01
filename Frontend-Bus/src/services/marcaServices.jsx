@@ -1,7 +1,6 @@
 import { getToken } from "./AuthServices";
 
-const BASE_URL = "http://localhost:8080";
-
+const BASE_URL = "https://bus-system-production.up.railway.app";
 const authHeader = () => ({
     "Authorization": `Bearer ${getToken()}`,
     "Content-Type": "application/json"
