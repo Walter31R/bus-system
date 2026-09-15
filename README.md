@@ -125,7 +125,7 @@ Relación: muchos buses pueden pertenecer a una misma marca.
 DB_URL=jdbc:mysql://localhost:3306/db_bus
 DB_USERNAME=root
 DB_PASSWORD=tu_password
-JWT_SECRET=clave_secreta_cualquiera
+JWT_SECRET=tu_clave_muy_secreta_cualquiera
 ```
 
 4. Corre el proyecto desde IntelliJ
